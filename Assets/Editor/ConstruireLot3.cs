@@ -9,6 +9,8 @@ public static class ConstruireLot3
 {
     private const string Racine = "BlueROV2";
     private static Material noir, bleu, alu, verre, helice, lampe, jaune;
+    private static bool modeleCad;
+    private const string ModeleCadPath = "Assets/Models/BlueROV2_R4.obj";
 
     [MenuItem("BLUE ROV/Lot 3 - Reconstruire le BlueROV2")]
     private static void Menu()
@@ -43,9 +45,21 @@ public static class ConstruireLot3
         var rov = new GameObject(Racine).transform;
         float sol = ConstruireLot1.Fond(-60f, -6.5f);
         rov.position = new Vector3(-60f, sol + 5f, -6.5f);
-        Chassis(rov);
+        modeleCad = AssetDatabase.LoadAssetAtPath<GameObject>(ModeleCadPath) != null;
+        if (modeleCad)
+        {
+            var modele = PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(ModeleCadPath)) as GameObject;
+            modele.name = "Modele_CAD_BlueROV2_R4";
+            modele.transform.SetParent(rov, false);
+            modele.transform.localPosition = Vector3.zero;
+            modele.transform.localRotation = Quaternion.identity;
+            modele.transform.localScale = Vector3.one;
+            var materiauCad = Lit("ROV_CAD_R4", new Color(0.12f, 0.19f, 0.24f), 0.32f, 0.28f);
+            foreach (var r in modele.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = materiauCad;
+        }
+        else Chassis(rov);
         var boite = rov.gameObject.AddComponent<BoxCollider>();
-        boite.size = new Vector3(0.338f, 0.254f, 0.457f);
+        boite.size = modeleCad ? new Vector3(0.34405f, 0.25440f, 0.45720f) : new Vector3(0.338f, 0.254f, 0.457f);
 
         // 4 propulseurs horizontaux a 45 degres, 2 verticaux. L'axe +Z local est le sens de poussee.
         var parent = new GameObject("Propulseurs").transform;
@@ -81,8 +95,11 @@ public static class ConstruireLot3
                 l.shadows = LightShadows.None;
                 phares.Add(l);
             }
-        Poser(fa, alu, rov, "PharesCorps");
-        Poser(fl, lampe, rov, "PharesVerre");
+        if (!modeleCad)
+        {
+            Poser(fa, alu, rov, "PharesCorps");
+            Poser(fl, lampe, rov, "PharesVerre");
+        }
 
         // Camera embarquee, dans le dome
         var libre = Object.FindAnyObjectByType<CameraExploration>(FindObjectsInactive.Include);
@@ -206,6 +223,10 @@ public static class ConstruireLot3
         t.SetParent(parent, false);
         t.localPosition = pos;
         t.localRotation = Quaternion.LookRotation(axe, Mathf.Abs(axe.y) > 0.9f ? Vector3.forward : Vector3.up);
+
+        // Le CAD importe contient deja les six propulseurs visibles. Ces transforms restent
+        // comme points d'application des forces pour PilotageROV, sans dupliquer les pieces.
+        if (modeleCad) return;
 
         // Tuyere creuse
         var f = new ConstruireLot2.Forme();

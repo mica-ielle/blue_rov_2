@@ -1,0 +1,7 @@
+newmtl BlueROV2_CAD
+Ka 0.08 0.10 0.12
+Kd 0.18 0.24 0.29
+Ks 0.32 0.32 0.32
+Ns 48
+d 1
+illum 2
