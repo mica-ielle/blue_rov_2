@@ -26,9 +26,10 @@ public static class ConstruireLot5
         GameObject rov = GameObject.Find("BlueROV2");
         if (rov == null) return;
         bool ancienModele = GameObject.Find("Modele_BlueROV2_ROS") == null;
+        OmbilicalDynamique ombilical = GameObject.Find("Ombilical_BlueROV_Treuil")?.GetComponent<OmbilicalDynamique>();
         bool incomplet = rov.GetComponent<Rigidbody>() == null
             || rov.GetComponent<PilotageROV>() == null
-            || GameObject.Find("Ombilical_BlueROV_Treuil")?.GetComponent<OmbilicalDynamique>() == null
+            || ombilical == null || ombilical.longueurTotale < 300f || ombilical.tambour == null
             || ancienModele;
         if (!incomplet)
         {
@@ -102,6 +103,33 @@ public static class ConstruireLot5
         Beam("Treuil_montant_D",new Vector3(-1.85f,1.35f,-6.45f),new Vector3(-1.85f,3.15f,-6.45f),.12f,steel,root);
         Beam("Treuil_traverse",new Vector3(-3.15f,3.15f,-6.45f),new Vector3(-1.85f,3.15f,-6.45f),.14f,yellow,root);
         Beam("Tambour_treuil",new Vector3(-3f,2.2f,-6.45f),new Vector3(-2f,2.2f,-6.45f),.34f,navy,root);
+        Transform tambour = root.Find("Tambour_treuil");
+        // Bobine stylisée : 7 couches hélicoïdales représentent environ 300 m de câble.
+        Vector3 tambourCentre = new Vector3(-2.5f, 2.2f, -6.45f);
+        for (int couche = 0; couche < 7; couche++)
+        {
+            var bobine = new GameObject("Couche_cable_" + (couche + 1));
+            bobine.transform.SetParent(tambour, false);
+            var lr = bobine.AddComponent<LineRenderer>();
+            lr.useWorldSpace = false;
+            lr.sharedMaterial = tether;
+            lr.startWidth = lr.endWidth = .012f;
+            lr.numCornerVertices = 2;
+            const int tours = 20, pointsParTour = 24;
+            int points = tours * pointsParTour + 1;
+            lr.positionCount = points;
+            float rayon = .345f + couche * .009f;
+            for (int i = 0; i < points; i++)
+            {
+                float t = i / (float)(points - 1);
+                float angle = t * tours * Mathf.PI * 2f;
+                // Le cylindre parent a une échelle (.68, .5, .68) : compensation pour garder les mètres.
+                Vector3 p = new Vector3(Mathf.Cos(angle) * rayon / .68f,
+                    (t - .5f) * .86f / .5f,
+                    Mathf.Sin(angle) * rayon / .68f);
+                lr.SetPosition(i, p);
+            }
+        }
         Beam("Axe_treuil",new Vector3(-3.35f,2.2f,-6.45f),new Vector3(-1.65f,2.2f,-6.45f),.09f,steel,root);
         Beam("Guide_ombilical",new Vector3(-2.5f,3.1f,-6.45f),new Vector3(-2.5f,2.7f,-6.45f),.075f,yellow,root);
 
@@ -160,11 +188,11 @@ public static class ConstruireLot5
         // Le câble suit le guide extérieur de la rampe puis rejoint le treuil.
         var guideRampe = new GameObject("Guide_Cable_Rampe").transform;
         guideRampe.SetParent(root, false);
-        guideRampe.localPosition = RampTop + dir * departRampe
-            + sideAxis * (RampWidth * .5f + .48f) + normale * .78f;
+        // Le guide est au sommet de la rampe : en rappel, le câble tire le ROV vers le berceau.
+        guideRampe.localPosition = RampTop + dir * .55f + normale * .35f;
         var guidePont = new GameObject("Guide_Cable_Ponton").transform;
         guidePont.SetParent(root, false);
-        guidePont.localPosition = RampTop + sideAxis * (RampWidth * .5f + .48f) + normale * .78f;
+        guidePont.localPosition = RampTop + sideAxis * (RampWidth * .5f + .48f) + normale * 1.05f;
         var ancrageTreuil = new GameObject("Ancrage_Cable_Treuil").transform;
         ancrageTreuil.SetParent(root, false);
         ancrageTreuil.localPosition = new Vector3(-2.5f, 2.72f, -6.45f);
@@ -181,6 +209,10 @@ public static class ConstruireLot5
         cable.guidePont = guidePont;
         cable.ancrageTreuil = ancrageTreuil;
         cable.rov = corps;
+        cable.tambour = tambour;
+        cable.longueurTotale = 300f;
+        cable.longueurMax = 24f;
+        cable.vitesseRembobinage = 3f;
 
         // Deux projecteurs de pont donnent une lecture claire du ROV et de la rampe.
         for (int s = -1; s <= 1; s += 2)

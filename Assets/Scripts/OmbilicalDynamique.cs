@@ -10,13 +10,25 @@ public sealed class OmbilicalDynamique : MonoBehaviour
     public Transform guideRampe;
     public Transform guidePont;
     public Transform ancrageTreuil;
+    public Transform tambour;
     public Rigidbody rov;
-    public float longueurMax = 25f;
+    [Min(15f)] public float longueurTotale = 300f;
+    [Min(15f)] public float longueurMax = 24f;
+    [Min(0.1f)] public float vitesseRembobinage = 3f;
+    [Min(0.05f)] public float rayonTambour = 0.36f;
     public float raideur = 22f;
     public float amortissement = 5f;
 
     private const int EchantillonsParTroncon = 10;
     private LineRenderer ligne;
+    private float longueurInitiale;
+    private float longueurUtilisee;
+    private bool rappelActif;
+    private Quaternion rotationTambourInitiale;
+
+    public bool RappelActif => rappelActif;
+    public float LongueurUtilisee => longueurUtilisee;
+    private bool tambourInitialise;
 
     private void Awake()
     {
@@ -27,6 +39,42 @@ public sealed class OmbilicalDynamique : MonoBehaviour
         ligne.alignment = LineAlignment.View;
         ligne.shadowCastingMode = ShadowCastingMode.On;
         ligne.receiveShadows = true;
+        longueurInitiale = longueurMax;
+    }
+
+    private void Start()
+    {
+        longueurInitiale = longueurMax;
+        CapturerRotationTambour();
+    }
+
+    private void CapturerRotationTambour()
+    {
+        if (tambour == null || tambourInitialise) return;
+        rotationTambourInitiale = tambour.localRotation;
+        tambourInitialise = true;
+    }
+
+    public void BasculerRappel()
+    {
+        rappelActif = !rappelActif;
+        if (rappelActif) longueurMax = Mathf.Min(longueurMax, CalculerLongueur() + 0.35f);
+    }
+
+    public void Reinitialiser()
+    {
+        rappelActif = false;
+        longueurMax = longueurInitiale;
+        CapturerRotationTambour();
+        if (tambour != null && tambourInitialise) tambour.localRotation = rotationTambourInitiale;
+    }
+
+    private float CalculerLongueur()
+    {
+        if (depart == null || guideRampe == null || guidePont == null || ancrageTreuil == null) return 0f;
+        return Vector3.Distance(depart.position, guideRampe.position)
+             + Vector3.Distance(guideRampe.position, guidePont.position)
+             + Vector3.Distance(guidePont.position, ancrageTreuil.position);
     }
 
     private void LateUpdate()
@@ -54,9 +102,29 @@ public sealed class OmbilicalDynamique : MonoBehaviour
     {
         if (!Application.isPlaying) return;
         if (rov == null || depart == null || guideRampe == null || guidePont == null || ancrageTreuil == null) return;
-        float longueur = Vector3.Distance(depart.position, guideRampe.position)
-                       + Vector3.Distance(guideRampe.position, guidePont.position)
-                       + Vector3.Distance(guidePont.position, ancrageTreuil.position);
+        float longueur = CalculerLongueur();
+        longueurUtilisee = longueur;
+        float longueurMin = Vector3.Distance(guideRampe.position, guidePont.position)
+                          + Vector3.Distance(guidePont.position, ancrageTreuil.position) + 0.3f;
+
+        if (rappelActif)
+        {
+            float rembobinee = Mathf.Min(vitesseRembobinage * Time.fixedDeltaTime, longueurMax - longueurMin);
+            longueurMax = Mathf.Max(longueurMin, longueurMax - rembobinee);
+            if (tambour != null && rembobinee > 0f)
+            {
+                CapturerRotationTambour();
+                float degres = rembobinee / (2f * Mathf.PI * rayonTambour) * 360f;
+                tambour.localRotation *= Quaternion.AngleAxis(degres, Vector3.up);
+            }
+            if (longueurMax <= longueurMin + 0.001f) rappelActif = false;
+        }
+        else if (longueur < longueurTotale)
+        {
+            // Le treuil laisse sortir du câble automatiquement quand le ROV s'éloigne.
+            longueurMax = Mathf.Min(longueurTotale, Mathf.Max(longueurMax, longueur + 0.75f));
+        }
+
         float extension = longueur - longueurMax;
         if (extension <= 0f) return;
 

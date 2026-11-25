@@ -21,7 +21,7 @@ Dans Unity, le menu **BLUE ROV** contient :
 2. **Lot 2 - Reconstruire les éoliennes** — remplace uniquement le parc : six turbines, fondations, rotors et câbles électriques.
 3. **Lot 3 - Reconstruire le BlueROV2** — remplace uniquement le robot : châssis, flotteurs, six propulseurs, phares, caméras et connecteur de câble.
 4. **Lot 4 - Activer le pilotage** — ajoute au ROV le Rigidbody et le script de pilotage sous-marin.
-5. **Lot 5 - Ajouter la rampe de lancement** — ajoute le ponton flottant, le treuil, les garde-corps, la rampe inclinée, le berceau et l'ombilical jaune entre le ROV et le treuil. Le ROV et la caméra sont placés pour cette mise à l'eau.
+5. **Lot 5 - Ajouter la rampe de lancement** — ajoute le ponton flottant, le treuil, les garde-corps, la rampe inclinée, le berceau et l'ombilical jaune de 300 m entre le ROV et le treuil. Une bobine hélicoïdale représente le câble enroulé. Le ROV et la caméra sont placés pour cette mise à l'eau.
 
 Pour reconstruire toute la scène, lance les lots dans cet ordre : **1 → 2 → 3 → 4 → 5**. Le lot 1 efface les objets des autres lots. Le lot 3 recrée le ROV; relance ensuite le lot 5 pour reconnecter le câble. Le lot 4 est nécessaire pour piloter le véhicule.
 
@@ -32,7 +32,8 @@ Les générateurs de captures `CapturesLot1.cs`, `CapturesLot2.cs` et `CapturesL
 - `Mer.cs` calcule la hauteur de la houle et envoie les paramètres communs au shader de l'océan. La hauteur visuelle et celle utilisée par la physique partagent le même calcul.
 - `AmbianceSousMarine.cs` adapte le brouillard, la couleur ambiante, le ciel et l'intensité du soleil selon la profondeur de la caméra.
 - `CameraExploration.cs` déplace la caméra libre, la garde au-dessus du fond et permet de regarder à la souris.
-- `PilotageROV.cs` applique flottabilité, masse d'eau, traînée, courant et poussée des six propulseurs. Il affiche aussi la télémétrie.
+- `PilotageROV.cs` applique flottabilité, masse d'eau, traînée, courant et poussée des six propulseurs. Il affiche aussi la télémétrie et le panneau de rappel du ROV.
+- `OmbilicalDynamique.cs` dessine le câble entre l'attache arrière du robot, les guides et le treuil. Il paie automatiquement du câble jusqu'à 300 m, limite le rayon d'action, et rembobine à 3 m/s en tirant le ROV vers le sommet de la rampe.
 - `EquipementsROV.cs` bascule entre vue poursuite, caméra du robot et caméra libre; il commande aussi les phares.
 - `HeliceROV.cs` anime les hélices des propulseurs selon leur commande.
 - `RotorEolienne.cs` fait tourner les pales des turbines.
@@ -41,7 +42,7 @@ Les scripts de génération sont des outils d'éditeur; les scripts ci-dessus so
 
 ## Commandes pendant Play
 
-Lance le **Lot 5** (il ajoute maintenant aussi les composants physiques et le pilotage), puis clique sur Play. Le panneau **COMMANDES ROV** en bas à droite permet de piloter à la souris : clique une fois pour activer une direction, reclique pour l'arrêter; **STOP** coupe toutes les commandes du panneau.
+Lance le **Lot 5** (il ajoute maintenant aussi les composants physiques et le pilotage), puis clique sur Play. Le panneau **COMMANDES ROV** en bas à droite permet de piloter à la souris : clique une fois pour activer une direction, reclique pour l'arrêter; **STOP** coupe toutes les commandes du panneau. Le bouton **REMBOBINER · RAPPELER LE ROV** enroule le câble à 3 m/s et ramène le robot vers le guide fixé en haut de la rampe. Clique à nouveau sur le bouton pour interrompre le rappel. Le câble se déploie à mesure que le ROV s'éloigne et sa longueur maximale est de 300 m.
 
 - **Z / S** : avancer / reculer
 - **Q / D** : aller à gauche / à droite
@@ -53,6 +54,7 @@ Lance le **Lot 5** (il ajoute maintenant aussi les composants physiques et le pi
 - **H / G** : activer / désactiver le maintien de profondeur / du cap
 - **K** : activer / désactiver le courant
 - **R** : replacer le ROV au départ; **1 à 4** : régler la puissance
+- **REMBOBINER · RAPPELER LE ROV** : enrouler l'ombilical et tirer le ROV vers la plateforme; le bouton devient **ARRÊTER LE REMBOBINAGE** pendant le rappel
 - En caméra libre : clic droit + souris pour regarder; Maj pour accélérer. Le pavé à l'écran peut aussi commander le robot dans cette vue.
 
 ## Modèle et provenance

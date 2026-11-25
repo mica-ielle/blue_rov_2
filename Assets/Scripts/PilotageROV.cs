@@ -52,6 +52,7 @@ public class PilotageROV : MonoBehaviour
     private const float G = 9.81f, DemiHauteur = 0.127f;
     private Rigidbody rb;
     private EquipementsROV equipements;
+    private OmbilicalDynamique ombilical;
     private Transform[] props;
     private HeliceROV[] helices;
     private float[] etat;
@@ -65,6 +66,7 @@ public class PilotageROV : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         equipements = GetComponent<EquipementsROV>();
+        ombilical = FindAnyObjectByType<OmbilicalDynamique>(FindObjectsInactive.Include);
         Transform parent = transform.Find("Propulseurs");
         props = new Transform[parent.childCount];
         helices = new HeliceROV[props.Length];
@@ -97,6 +99,7 @@ public class PilotageROV : MonoBehaviour
 
     public void RetourDepart()
     {
+        if (ombilical != null) ombilical.Reinitialiser();
         rb.position = departPos;
         rb.rotation = departRot;
         transform.SetPositionAndRotation(departPos, departRot);
@@ -128,6 +131,7 @@ public class PilotageROV : MonoBehaviour
     private Vector4 Lire()
     {
         if (commandeExterne) return commande;
+        if (ombilical != null && ombilical.RappelActif) return Vector4.zero;
         Keyboard k = Keyboard.current;
         if (commandePanneau.sqrMagnitude > 0f) return commandePanneau;
         // En camera libre, le clavier deplace la camera et le robot tient sa position.
@@ -288,8 +292,8 @@ public class PilotageROV : MonoBehaviour
             "\nE/A : monter / descendre    C : vue    L : phares    Manette : sticks + gachettes");
 
         // Pavé cliquable : chaque direction reste active jusqu'au second clic ou STOP.
-        float x = Screen.width - 302f, y = Screen.height - 238f;
-        GUI.Box(new Rect(x, y, 292f, 174f), "COMMANDES ROV (clic pour activer)");
+        float x = Screen.width - 302f, y = Screen.height - 292f;
+        GUI.Box(new Rect(x, y, 292f, 232f), "COMMANDES ROV (clic pour activer)");
         BoutonAxe(new Rect(x + 8, y + 30, 88, 34), "AVANT", 2, 1f);
         BoutonAxe(new Rect(x + 100, y + 30, 88, 34), "ARRIERE", 2, -1f);
         GUI.backgroundColor = new Color(0.72f, 0.18f, 0.16f);
@@ -301,7 +305,18 @@ public class PilotageROV : MonoBehaviour
         BoutonAxe(new Rect(x + 8, y + 110, 88, 34), "DESCENDRE", 1, -1f);
         BoutonAxe(new Rect(x + 100, y + 110, 88, 34), "TOURNER G", 3, -1f);
         BoutonAxe(new Rect(x + 192, y + 110, 88, 34), "TOURNER D", 3, 1f);
-        GUI.Label(new Rect(x + 8, y + 146, 280, 22), "H/G : maintien profondeur/cap  |  R : reset");
+        bool rappel = ombilical != null && ombilical.RappelActif;
+        GUI.backgroundColor = rappel ? new Color(1f, 0.55f, 0.12f) : new Color(0.95f, 0.72f, 0.2f);
+        if (GUI.Button(new Rect(x + 8, y + 150, 272, 34), rappel ? "ARRÊTER LE REMBOBINAGE" : "REMBOBINER · RAPPELER LE ROV"))
+        {
+            commandePanneau = Vector4.zero;
+            if (ombilical != null) ombilical.BasculerRappel();
+        }
+        GUI.backgroundColor = Color.white;
+        string cable = ombilical == null ? "Câble non connecté" :
+            $"Câble : {ombilical.LongueurUtilisee:F0} / {ombilical.longueurTotale:F0} m · treuil {ombilical.vitesseRembobinage:F0} m/s";
+        GUI.Label(new Rect(x + 8, y + 186, 280, 20), cable);
+        GUI.Label(new Rect(x + 8, y + 205, 280, 20), "H/G : profondeur/cap   ·   R : reset");
     }
 
     private void BoutonAxe(Rect zone, string texte, int axe, float sens)
