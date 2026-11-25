@@ -58,3 +58,18 @@ Pour piloter, assure-toi d'avoir lancé le **Lot 4**, puis clique sur Play :
 
 Le mode Play teste les comportements; il ne remplace pas le fait d'enregistrer la scène après une modification de placement dans l'éditeur.
 
+
+## Fidélité et provenance du modèle ROV
+
+Le robot de la scène est bien construit selon l'architecture du **BlueROV2 standard** : quatre propulseurs horizontaux inclinés et deux verticaux. Le générateur place aussi le collider à 0,457 × 0,338 × 0,254 m, soit l'enveloppe nominale publiée par Blue Robotics. **Ce n'est toutefois pas une reproduction 3D exacte** : le châssis, les flotteurs, les tubes, les phares et les hélices sont des formes procédurales simplifiées.
+
+### Méthode utilisée dans ce projet
+
+Aucun modèle FBX/OBJ/STEP externe n'est actuellement importé. `Assets/Editor/ConstruireLot3.cs` construit les pièces avec le générateur de géométrie `ConstruireLot2.Forme`, crée les matériaux, puis enregistre les meshes `.asset` dans `Assets/Generated`. Le lot 3 place ces meshes dans la scène et ajoute caméra, éclairages et comportements. C'est donc une **construction procédurale Unity**, pas un import d'un modèle fabricant.
+
+### Références de modèles
+
+- **Référence fabricant recommandée : BlueROV2 R4**, modèle CAD officiel publié par Blue Robotics : [page produit et fichiers 3D R4](https://bluerobotics.com/store/rov/bluerov2/) · [archive CAD R4](https://cad.bluerobotics.com/BLUEROV2-R4.zip). Elle fournit la géométrie de la révision R4; le projet ne l'a pas encore convertie ni importée.
+- **Exemple fourni : TurboSquid 1521263**, [Underwater Robot BlueROV2](https://www.turbosquid.com/fr/3d-models/3d-underwater-robot-bluerov2-rov-model-1521263). La fiche consultée indique 167 407 polygones, des textures 4096 × 4096 et des exports Unity/FBX/OBJ; son prix affiché était de 79 $ au moment de la vérification. Ce modèle commercial n'est pas inclus dans le dépôt et n'a pas été importé.
+
+Pour obtenir une géométrie exacte dans Unity, il faut importer le CAD R4 après conversion en FBX/glTF avec un outil compatible CAD, ou utiliser un export Unity/FBX sous licence du modèle TurboSquid. Il faudra ensuite vérifier l'échelle, les axes, les matériaux et les points d'attache du pilotage, des phares, de la caméra et de l'ombilical.
