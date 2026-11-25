@@ -41,7 +41,7 @@ Les scripts de génération sont des outils d'éditeur; les scripts ci-dessus so
 
 ## Commandes pendant Play
 
-Lance le **Lot 4**, puis clique sur Play. Le panneau **COMMANDES ROV** en bas à droite permet de piloter à la souris : clique une fois pour activer une direction, reclique pour l'arrêter; **STOP** coupe toutes les commandes du panneau.
+Lance le **Lot 5** (il ajoute maintenant aussi les composants physiques et le pilotage), puis clique sur Play. Le panneau **COMMANDES ROV** en bas à droite permet de piloter à la souris : clique une fois pour activer une direction, reclique pour l'arrêter; **STOP** coupe toutes les commandes du panneau.
 
 - **Z / S** : avancer / reculer
 - **Q / D** : aller à gauche / à droite
@@ -59,7 +59,7 @@ Lance le **Lot 4**, puis clique sur Play. Le panneau **COMMANDES ROV** en bas à
 
 Le modèle 3D utilisé par la scène provient de [patrickelectric/bluerov_ros_playground](https://github.com/patrickelectric/bluerov_ros_playground) : `Assets/Models/BlueRov2.dae`. Ce Collada embarque les couleurs diffuses des différentes pièces. Le constructeur de scène le charge sans remplacer ses matériaux par un matériau uniforme.
 
-`Assets/Models/BlueRov2.urdf` est une version URDF standard minimale avec le maillage et le joint fixe de la caméra. `BlueRov2.urdf.xacro` conserve la description ROS upstream, y compris ses éléments Gazebo/Xacro. L'URDF peut être importé comme robot articulé avec le [Unity Robotics URDF Importer](https://github.com/Unity-Technologies/URDF-Importer); la scène actuelle utilise directement le DAE. Le contrôleur de Unity applique la poussée physique via six points de poussée créés dans `Assets/Editor/ConstruireLot3.cs`; les six propulseurs visibles sont déjà dans le modèle 3D.
+`Assets/Models/BlueRov2.urdf` est une version URDF standard minimale avec le maillage et le joint fixe de la caméra. `BlueRov2.urdf.xacro` conserve la description ROS upstream, y compris ses éléments Gazebo/Xacro. L'URDF peut être importé comme robot articulé avec le [Unity Robotics URDF Importer](https://github.com/Unity-Technologies/URDF-Importer); la scène actuelle utilise directement le DAE. Le contrôleur de Unity applique la poussée physique via six points de poussée créés dans `Assets/Editor/ConstruireLot3.cs`; les six propulseurs visibles sont déjà dans le modèle 3D. Le lot 5 ajoute automatiquement `Rigidbody` et `PilotageROV`, place le BlueROV2 sur la partie immergée haute de la rampe et relie le connecteur arrière au treuil avec un câble dynamique. Le câble suit le robot et applique une traction douce lorsqu'il atteint sa longueur de déploiement.
 
 Le manifeste upstream indique **LGPLv3**. Voir [NOTICE_BlueROV2_ROS.md](Models/NOTICE_BlueROV2_ROS.md) et le dépôt source pour la provenance et les modalités d'import.
 

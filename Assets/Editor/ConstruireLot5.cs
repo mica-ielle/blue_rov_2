@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -11,7 +10,37 @@ public static class ConstruireLot5
     private static readonly Vector3 RampTop = new Vector3(0f, .95f, .6f);
     private static readonly Vector3 RampEnd = new Vector3(0f, -6.2f, 18f);
     private const float RampWidth = 3.6f;
+    // Met à niveau une scène Lot 5 ancienne après l'import des nouveaux scripts.
+    [InitializeOnLoadMethod]
+    private static void SurveillerSceneChargee()
+    {
+        EditorApplication.update -= VerifierSceneChargee;
+        EditorApplication.update += VerifierSceneChargee;
+    }
 
+    private static void VerifierSceneChargee()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling) return;
+        var active = EditorSceneManager.GetActiveScene();
+        if (active.path != ConstruireLot1.CheminScene) return;
+        GameObject rov = GameObject.Find("BlueROV2");
+        if (rov == null) return;
+        bool ancienModele = GameObject.Find("Modele_BlueROV2_ROS") == null;
+        bool incomplet = rov.GetComponent<Rigidbody>() == null
+            || rov.GetComponent<PilotageROV>() == null
+            || GameObject.Find("Ombilical_BlueROV_Treuil")?.GetComponent<OmbilicalDynamique>() == null
+            || ancienModele;
+        if (!incomplet)
+        {
+            EditorApplication.update -= VerifierSceneChargee;
+            return;
+        }
+        EditorApplication.update -= VerifierSceneChargee;
+        if (active.isDirty) EditorSceneManager.SaveScene(active);
+        if (ancienModele) ConstruireLot3.Construire();
+        ConstruireLot4.Construire();
+        Build();
+    }
     [MenuItem("BLUE ROV/Lot 5 - Ajouter la rampe de lancement")]
     private static void Menu()
     {
@@ -26,6 +55,13 @@ public static class ConstruireLot5
 
         GameObject rov = GameObject.Find("BlueROV2");
         if (rov == null) throw new System.Exception("Construis d'abord le BlueROV2 avec le menu BLUE ROV > Lot 3.");
+
+        // Lot 5 doit rester pilotable même si l'utilisateur n'a pas lancé le lot 4.
+        Rigidbody corps = rov.GetComponent<Rigidbody>();
+        if (corps == null) corps = rov.AddComponent<Rigidbody>();
+        corps.useGravity = false;
+        corps.isKinematic = false;
+        if (rov.GetComponent<PilotageROV>() == null) rov.AddComponent<PilotageROV>();
 
         Transform root = new GameObject(RootName).transform;
         root.position = Origin;
@@ -96,38 +132,81 @@ public static class ConstruireLot5
             Beam("Entretoise_"+i,p+sideAxis*RampWidth*.5f,p-sideAxis*RampWidth*.5f,.065f,yellow,root);
         }
 
-        // Replace le ROV sur son berceau, oriente vers la sortie.
-        Vector3 rovLocal=RampEnd-dir*1.65f+rampRot*Vector3.up*.42f;
+        // Le ROV attend sur la partie immergée haute de la rampe, orienté vers la sortie.
+        Vector3 normale = rampRot * Vector3.up;
+        const float departRampe = 3.4f;
+        Vector3 rovLocal = RampTop + dir * departRampe + normale * .43f;
         rov.transform.SetPositionAndRotation(root.TransformPoint(rovLocal),root.rotation*rampRot);
         Transform old=rov.transform.Find("Ombilical");
         if(old!=null) Object.DestroyImmediate(old.gameObject);
-        Vector3 cradle=rovLocal-rampRot*Vector3.up*.27f;
+        Vector3 cradle=rovLocal-rampRot*Vector3.up*.19f;
         Box("Berceau_BlueROV",cradle,new Vector3(.78f,.12f,.92f),rampRot,navy,false);
         for(int s=-1;s<=1;s+=2)
             Box("Patin_"+s,cradle+rampRot*new Vector3(s*.35f,.12f,0),new Vector3(.09f,.22f,.75f),rampRot,yellow,false);
 
-        // Ombilical continu entre le connecteur arrière du ROV et le guide du treuil.
-        Vector3 start=rov.transform.TransformPoint(new Vector3(0,.045f,-.195f));
-        Vector3 low=root.TransformPoint(RampTop+dir*(rampLength*.83f)+sideAxis*(RampWidth*.5f+.45f)+Vector3.up*.72f);
-        Vector3 high=root.TransformPoint(RampTop+sideAxis*(RampWidth*.5f+.45f)+Vector3.up*.72f);
-        Vector3 anchor=root.TransformPoint(new Vector3(-2.5f,2.72f,-6.45f));
-        var pts=new List<Vector3>();
-        Sample(pts,start,low,Vector3.up*.4f,12);
-        Sample(pts,low,high,Vector3.up*.3f,24,true);
-        Sample(pts,high,anchor,Vector3.up*.22f,12,true);
-        for(int i=0;i<pts.Count;i++) pts[i]=root.InverseTransformPoint(pts[i]);
-        var shape=new ConstruireLot2.Forme();
-        shape.Courbe(pts,.032f,8);
-        Mesh cableMesh=ConstruireLot1.Sauver(shape.Mesh(),"Ombilical_BlueROV_Treuil_mesh");
-        ConstruireLot1.Objet("Ombilical_BlueROV_Treuil",cableMesh,tether,root);
+        // Connecteur de coque : l'extrémité mobile du câble est réellement enfant du ROV.
+        var connecteur = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        connecteur.name = "Connecteur_Ombilical";
+        connecteur.transform.SetParent(rov.transform, false);
+        connecteur.transform.localPosition = new Vector3(0f, .045f, -.205f);
+        connecteur.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        connecteur.transform.localScale = new Vector3(.052f, .035f, .052f);
+        connecteur.GetComponent<MeshRenderer>().sharedMaterial = tether;
+        Object.DestroyImmediate(connecteur.GetComponent<Collider>());
+        var departCable = new GameObject("Attache_Cable_ROV").transform;
+        departCable.SetParent(rov.transform, false);
+        departCable.localPosition = new Vector3(0f, .045f, -.24f);
+
+        // Le câble suit le guide extérieur de la rampe puis rejoint le treuil.
+        var guideRampe = new GameObject("Guide_Cable_Rampe").transform;
+        guideRampe.SetParent(root, false);
+        guideRampe.localPosition = RampTop + dir * departRampe
+            + sideAxis * (RampWidth * .5f + .48f) + normale * .78f;
+        var guidePont = new GameObject("Guide_Cable_Ponton").transform;
+        guidePont.SetParent(root, false);
+        guidePont.localPosition = RampTop + sideAxis * (RampWidth * .5f + .48f) + normale * .78f;
+        var ancrageTreuil = new GameObject("Ancrage_Cable_Treuil").transform;
+        ancrageTreuil.SetParent(root, false);
+        ancrageTreuil.localPosition = new Vector3(-2.5f, 2.72f, -6.45f);
+
+        var cableObject = new GameObject("Ombilical_BlueROV_Treuil");
+        cableObject.transform.SetParent(root, false);
+        var ligne = cableObject.AddComponent<LineRenderer>();
+        ligne.sharedMaterial = tether;
+        ligne.startWidth = ligne.endWidth = .028f;
+        ligne.startColor = ligne.endColor = Color.white;
+        var cable = cableObject.AddComponent<OmbilicalDynamique>();
+        cable.depart = departCable;
+        cable.guideRampe = guideRampe;
+        cable.guidePont = guidePont;
+        cable.ancrageTreuil = ancrageTreuil;
+        cable.rov = corps;
+
+        // Deux projecteurs de pont donnent une lecture claire du ROV et de la rampe.
+        for (int s = -1; s <= 1; s += 2)
+        {
+            var phare = new GameObject("Projecteur_Rampe_" + s).AddComponent<Light>();
+            phare.transform.SetParent(root, false);
+            phare.transform.localPosition = new Vector3(s * 3.65f, 2.5f, .1f);
+            phare.transform.rotation = Quaternion.LookRotation(root.TransformDirection(dir));
+            phare.type = LightType.Spot;
+            phare.color = new Color(.60f, .86f, 1f);
+            phare.intensity = 18f;
+            phare.range = 26f;
+            phare.spotAngle = 72f;
+            phare.innerSpotAngle = 36f;
+            phare.shadows = LightShadows.None;
+        }
 
         // Aperçu cadré sur le ROV et la rampe.
         CameraExploration cam=Object.FindAnyObjectByType<CameraExploration>(FindObjectsInactive.Include);
         if(cam!=null)
         {
-            Vector3 target=root.TransformPoint(new Vector3(0,-1.8f,8f));
-            cam.transform.position=root.TransformPoint(new Vector3(14f,-1.8f,8f));
+            Vector3 target=root.TransformPoint(new Vector3(0f,-2.6f,6.8f));
+            cam.transform.position=root.TransformPoint(new Vector3(16f,12f,8.5f));
             cam.transform.rotation=Quaternion.LookRotation(target-cam.transform.position);
+            Camera preview = cam.GetComponent<Camera>();
+            if (preview != null) preview.fieldOfView = 58f;
             cam.Recaler();
         }
 
@@ -137,14 +216,6 @@ public static class ConstruireLot5
         Debug.Log("LOT5 OK - rampe et ombilical raccordes au treuil.");
     }
 
-    private static void Sample(List<Vector3> p,Vector3 a,Vector3 b,Vector3 arch,int n,bool skip=false)
-    {
-        for(int i=skip?1:0;i<=n;i++)
-        {
-            float t=i/(float)n;
-            p.Add(Vector3.Lerp(a,b,t)+arch*Mathf.Sin(t*Mathf.PI));
-        }
-    }
     private static void Box(string name,Vector3 pos,Vector3 size,Quaternion rot,Material mat,Transform parent,bool collider=true)
     {
         GameObject o=GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -171,3 +242,5 @@ public static class ConstruireLot5
         return m;
     }
 }
+
+

@@ -10,7 +10,7 @@ public class EquipementsROV : MonoBehaviour
     public Camera cameraROV;
     public Camera cameraLibre;
     public bool pharesAllumes = true;
-    public Vector3 reculPoursuite = new Vector3(0f, 0.45f, -1.5f);
+    public Vector3 reculPoursuite = new Vector3(0f, 0.7f, -2.6f);
 
     public TypeVue Vue { get; private set; }
     public bool VueLibre => Vue == TypeVue.Libre;
