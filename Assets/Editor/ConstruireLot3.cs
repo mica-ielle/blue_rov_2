@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -9,6 +10,8 @@ public static class ConstruireLot3
 {
     private const string Racine = "BlueROV2";
     private static Material noir, bleu, alu, verre, helice, lampe, jaune;
+    private static bool modeleCad;
+    private const string ModeleCadPath = "Assets/Models/BlueRov2.dae";
 
     [MenuItem("BLUE ROV/Lot 3 - Reconstruire le BlueROV2")]
     private static void Menu()
@@ -43,9 +46,20 @@ public static class ConstruireLot3
         var rov = new GameObject(Racine).transform;
         float sol = ConstruireLot1.Fond(-60f, -6.5f);
         rov.position = new Vector3(-60f, sol + 5f, -6.5f);
-        Chassis(rov);
+        modeleCad = AssetDatabase.LoadAssetAtPath<GameObject>(ModeleCadPath) != null;
+        if (modeleCad)
+        {
+            var modele = PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(ModeleCadPath)) as GameObject;
+            modele.name = "Modele_BlueROV2_ROS";
+            modele.transform.SetParent(rov, false);
+            modele.transform.localPosition = Vector3.zero;
+            modele.transform.localRotation = Quaternion.identity;
+            modele.transform.localScale = Vector3.one;
+            ConvertirMateriaux(modele);
+        }
+        else Chassis(rov);
         var boite = rov.gameObject.AddComponent<BoxCollider>();
-        boite.size = new Vector3(0.338f, 0.254f, 0.457f);
+        boite.size = modeleCad ? new Vector3(0.344f, 0.254f, 0.457f) : new Vector3(0.338f, 0.254f, 0.457f);
 
         // 4 propulseurs horizontaux a 45 degres, 2 verticaux. L'axe +Z local est le sens de poussee.
         var parent = new GameObject("Propulseurs").transform;
@@ -81,8 +95,11 @@ public static class ConstruireLot3
                 l.shadows = LightShadows.None;
                 phares.Add(l);
             }
-        Poser(fa, alu, rov, "PharesCorps");
-        Poser(fl, lampe, rov, "PharesVerre");
+        if (!modeleCad)
+        {
+            Poser(fa, alu, rov, "PharesCorps");
+            Poser(fl, lampe, rov, "PharesVerre");
+        }
 
         // Camera embarquee, dans le dome
         var libre = Object.FindAnyObjectByType<CameraExploration>(FindObjectsInactive.Include);
@@ -207,6 +224,10 @@ public static class ConstruireLot3
         t.localPosition = pos;
         t.localRotation = Quaternion.LookRotation(axe, Mathf.Abs(axe.y) > 0.9f ? Vector3.forward : Vector3.up);
 
+        // Le CAD importe contient deja les six propulseurs visibles. Ces transforms restent
+        // comme points d'application des forces pour PilotageROV, sans dupliquer les pieces.
+        if (modeleCad) return;
+
         // Tuyere creuse
         var f = new ConstruireLot2.Forme();
         f.Revolution(Vector3.zero, Vector3.forward, new List<Vector2> {
@@ -239,6 +260,42 @@ public static class ConstruireLot3
         m.SetFloat("_Smoothness", lisse);
         m.SetFloat("_Metallic", metal);
         return m;
+    }
+
+    private static void ConvertirMateriaux(GameObject modele)
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) return;
+        foreach (Renderer r in modele.GetComponentsInChildren<Renderer>(true))
+        {
+            Material[] sources = r.sharedMaterials;
+            var convertis = new Material[sources.Length];
+            for (int i = 0; i < sources.Length; i++)
+            {
+                Material source = sources[i];
+                if (source == null) continue;
+                string nom = "ROV_ROS_" + source.name;
+                foreach (char invalide in Path.GetInvalidFileNameChars()) nom = nom.Replace(invalide, '_');
+                string path = "Assets/Generated/" + nom + ".mat";
+                Material cible = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (cible == null)
+                {
+                    cible = new Material(shader) { name = nom };
+                    AssetDatabase.CreateAsset(cible, path);
+                }
+                else cible.shader = shader;
+
+                Color couleur = source.HasProperty("_Color") ? source.GetColor("_Color") : Color.white;
+                if (source.HasProperty("_BaseColor")) couleur *= source.GetColor("_BaseColor");
+                cible.SetColor("_BaseColor", couleur);
+                if (source.HasProperty("_MainTex") && cible.HasProperty("_BaseMap"))
+                    cible.SetTexture("_BaseMap", source.GetTexture("_MainTex"));
+                if (source.HasProperty("_Glossiness")) cible.SetFloat("_Smoothness", source.GetFloat("_Glossiness"));
+                if (source.HasProperty("_Metallic")) cible.SetFloat("_Metallic", source.GetFloat("_Metallic"));
+                convertis[i] = cible;
+            }
+            r.sharedMaterials = convertis;
+        }
     }
 
     private static void Poser(ConstruireLot2.Forme f, Material mat, Transform parent, string nom) =>
