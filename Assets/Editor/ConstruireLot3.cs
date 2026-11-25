@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -10,7 +11,7 @@ public static class ConstruireLot3
     private const string Racine = "BlueROV2";
     private static Material noir, bleu, alu, verre, helice, lampe, jaune;
     private static bool modeleCad;
-    private const string ModeleCadPath = "Assets/Models/BlueROV2_R4.obj";
+    private const string ModeleCadPath = "Assets/Models/BlueRov2.dae";
 
     [MenuItem("BLUE ROV/Lot 3 - Reconstruire le BlueROV2")]
     private static void Menu()
@@ -49,17 +50,16 @@ public static class ConstruireLot3
         if (modeleCad)
         {
             var modele = PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(ModeleCadPath)) as GameObject;
-            modele.name = "Modele_CAD_BlueROV2_R4";
+            modele.name = "Modele_BlueROV2_ROS";
             modele.transform.SetParent(rov, false);
             modele.transform.localPosition = Vector3.zero;
             modele.transform.localRotation = Quaternion.identity;
             modele.transform.localScale = Vector3.one;
-            var materiauCad = Lit("ROV_CAD_R4", new Color(0.12f, 0.19f, 0.24f), 0.32f, 0.28f);
-            foreach (var r in modele.GetComponentsInChildren<Renderer>(true)) r.sharedMaterial = materiauCad;
+            ConvertirMateriaux(modele);
         }
         else Chassis(rov);
         var boite = rov.gameObject.AddComponent<BoxCollider>();
-        boite.size = modeleCad ? new Vector3(0.34405f, 0.25440f, 0.45720f) : new Vector3(0.338f, 0.254f, 0.457f);
+        boite.size = modeleCad ? new Vector3(0.344f, 0.254f, 0.457f) : new Vector3(0.338f, 0.254f, 0.457f);
 
         // 4 propulseurs horizontaux a 45 degres, 2 verticaux. L'axe +Z local est le sens de poussee.
         var parent = new GameObject("Propulseurs").transform;
@@ -260,6 +260,42 @@ public static class ConstruireLot3
         m.SetFloat("_Smoothness", lisse);
         m.SetFloat("_Metallic", metal);
         return m;
+    }
+
+    private static void ConvertirMateriaux(GameObject modele)
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (shader == null) return;
+        foreach (Renderer r in modele.GetComponentsInChildren<Renderer>(true))
+        {
+            Material[] sources = r.sharedMaterials;
+            var convertis = new Material[sources.Length];
+            for (int i = 0; i < sources.Length; i++)
+            {
+                Material source = sources[i];
+                if (source == null) continue;
+                string nom = "ROV_ROS_" + source.name;
+                foreach (char invalide in Path.GetInvalidFileNameChars()) nom = nom.Replace(invalide, '_');
+                string path = "Assets/Generated/" + nom + ".mat";
+                Material cible = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (cible == null)
+                {
+                    cible = new Material(shader) { name = nom };
+                    AssetDatabase.CreateAsset(cible, path);
+                }
+                else cible.shader = shader;
+
+                Color couleur = source.HasProperty("_Color") ? source.GetColor("_Color") : Color.white;
+                if (source.HasProperty("_BaseColor")) couleur *= source.GetColor("_BaseColor");
+                cible.SetColor("_BaseColor", couleur);
+                if (source.HasProperty("_MainTex") && cible.HasProperty("_BaseMap"))
+                    cible.SetTexture("_BaseMap", source.GetTexture("_MainTex"));
+                if (source.HasProperty("_Glossiness")) cible.SetFloat("_Smoothness", source.GetFloat("_Glossiness"));
+                if (source.HasProperty("_Metallic")) cible.SetFloat("_Metallic", source.GetFloat("_Metallic"));
+                convertis[i] = cible;
+            }
+            r.sharedMaterials = convertis;
+        }
     }
 
     private static void Poser(ConstruireLot2.Forme f, Material mat, Transform parent, string nom) =>

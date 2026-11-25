@@ -39,6 +39,8 @@ public class PilotageROV : MonoBehaviour
     // Commande de test : lateral, vertical, avant, lacet. Utilisee si commandeExterne est vrai.
     [HideInInspector] public bool commandeExterne;
     [HideInInspector] public Vector4 commande;
+    // Commandes a bascule pour piloter a la souris, sans dependance au clavier.
+    private Vector4 commandePanneau;
 
     public float Profondeur => Niveau - transform.position.y;
     public float Cap => Mathf.Repeat(transform.eulerAngles.y, 360f);
@@ -127,14 +129,24 @@ public class PilotageROV : MonoBehaviour
     {
         if (commandeExterne) return commande;
         Keyboard k = Keyboard.current;
+        if (commandePanneau.sqrMagnitude > 0f) return commandePanneau;
         // En camera libre, le clavier deplace la camera et le robot tient sa position.
         if (k == null || (equipements != null && equipements.VueLibre)) return Vector4.zero;
         float Axe(bool plus, bool moins) => (plus ? 1f : 0f) - (moins ? 1f : 0f);
-        return new Vector4(
+        Vector4 clavier = new Vector4(
             Axe(k.dKey.isPressed, k.aKey.isPressed),
             Axe(k.eKey.isPressed, k.qKey.isPressed),
             Axe(k.wKey.isPressed, k.sKey.isPressed),
             Axe(k.rightArrowKey.isPressed, k.leftArrowKey.isPressed));
+        if (clavier.sqrMagnitude > 0f) return clavier;
+
+        // Manette : stick gauche = translation horizontale, stick droit = cap,
+        // gachettes = monter/descendre.
+        Gamepad pad = Gamepad.current;
+        if (pad == null) return Vector4.zero;
+        Vector2 gauche = Vector2.ClampMagnitude(pad.leftStick.ReadValue(), 1f);
+        float vertical = pad.rightTrigger.ReadValue() - pad.leftTrigger.ReadValue();
+        return new Vector4(gauche.x, vertical, gauche.y, pad.rightStick.x.ReadValue());
     }
 
     private static float Immersion(float y, float surface, float demi) => Mathf.Clamp01((surface - y) / (2f * demi) + 0.5f);
@@ -264,7 +276,6 @@ public class PilotageROV : MonoBehaviour
 
     private void OnGUI()
     {
-        if (equipements != null && equipements.VueLibre) return;
         GUI.Box(new Rect(10, 10, 330, 92), GUIContent.none);
         GUI.Label(new Rect(20, 14, 310, 84),
             $"<b>Profondeur {Profondeur:F2} m    Cap {Cap:000}    Vitesse {Vitesse:F2} m/s</b>" +
@@ -273,7 +284,37 @@ public class PilotageROV : MonoBehaviour
             $"\nCourant : {(courantActif ? courant.magnitude.ToString("F2") + " m/s" : "non")} (K)    Retour depart (R)");
         GUI.Box(new Rect(10, Screen.height - 54, 520, 44), GUIContent.none);
         GUI.Label(new Rect(20, Screen.height - 51, 500, 40),
-            "Z/S : avant / arriere    Q/D : gauche / droite    <- / -> : tourner" +
-            "\nE/A : monter / descendre    C : vue    L : phares");
+            "Z/S : avant / arriere    Q/D : gauche / droite    fleches : tourner" +
+            "\nE/A : monter / descendre    C : vue    L : phares    Manette : sticks + gachettes");
+
+        // Pavé cliquable : chaque direction reste active jusqu'au second clic ou STOP.
+        float x = Screen.width - 302f, y = Screen.height - 238f;
+        GUI.Box(new Rect(x, y, 292f, 174f), "COMMANDES ROV (clic pour activer)");
+        BoutonAxe(new Rect(x + 8, y + 30, 88, 34), "AVANT", 2, 1f);
+        BoutonAxe(new Rect(x + 100, y + 30, 88, 34), "ARRIERE", 2, -1f);
+        GUI.backgroundColor = new Color(0.72f, 0.18f, 0.16f);
+        if (GUI.Button(new Rect(x + 192, y + 30, 88, 34), "STOP")) commandePanneau = Vector4.zero;
+        GUI.backgroundColor = Color.white;
+        BoutonAxe(new Rect(x + 8, y + 70, 88, 34), "GAUCHE", 0, -1f);
+        BoutonAxe(new Rect(x + 100, y + 70, 88, 34), "DROITE", 0, 1f);
+        BoutonAxe(new Rect(x + 192, y + 70, 88, 34), "MONTER", 1, 1f);
+        BoutonAxe(new Rect(x + 8, y + 110, 88, 34), "DESCENDRE", 1, -1f);
+        BoutonAxe(new Rect(x + 100, y + 110, 88, 34), "TOURNER G", 3, -1f);
+        BoutonAxe(new Rect(x + 192, y + 110, 88, 34), "TOURNER D", 3, 1f);
+        GUI.Label(new Rect(x + 8, y + 146, 280, 22), "H/G : maintien profondeur/cap  |  R : reset");
+    }
+
+    private void BoutonAxe(Rect zone, string texte, int axe, float sens)
+    {
+        bool actif = commandePanneau[axe] == sens;
+        GUI.backgroundColor = actif ? new Color(0.2f, 0.72f, 0.42f) : Color.white;
+        if (GUI.Button(zone, actif ? "ON " + texte : texte))
+        {
+            commandePanneau[axe] = actif ? 0f : sens;
+            // Une seule direction a la fois sur le meme axe.
+            if (!actif) commandePanneau[axe] = sens;
+        }
+        GUI.backgroundColor = Color.white;
     }
 }
+

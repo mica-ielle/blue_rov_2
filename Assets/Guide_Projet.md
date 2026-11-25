@@ -41,35 +41,25 @@ Les scripts de génération sont des outils d'éditeur; les scripts ci-dessus so
 
 ## Commandes pendant Play
 
-Pour piloter, assure-toi d'avoir lancé le **Lot 4**, puis clique sur Play :
+Lance le **Lot 4**, puis clique sur Play. Le panneau **COMMANDES ROV** en bas à droite permet de piloter à la souris : clique une fois pour activer une direction, reclique pour l'arrêter; **STOP** coupe toutes les commandes du panneau.
 
 - **Z / S** : avancer / reculer
 - **Q / D** : aller à gauche / à droite
 - **E / A** : monter / descendre
 - **Flèches gauche / droite** : tourner
+- **Manette** : stick gauche pour avancer et se décaler, stick droit horizontal pour tourner, gâchettes pour monter/descendre
 - **C** : changer de caméra (poursuite, caméra du ROV, caméra libre)
 - **L** : allumer / éteindre les phares
-- **H** : activer / désactiver le maintien de profondeur
-- **G** : activer / désactiver le maintien du cap
+- **H / G** : activer / désactiver le maintien de profondeur / du cap
 - **K** : activer / désactiver le courant
-- **R** : replacer le ROV à son point de départ
-- **1 à 4** : régler la puissance des commandes
-- En caméra libre : **clic droit + souris** pour regarder; **Maj** pour accélérer.
+- **R** : replacer le ROV au départ; **1 à 4** : régler la puissance
+- En caméra libre : clic droit + souris pour regarder; Maj pour accélérer. Le pavé à l'écran peut aussi commander le robot dans cette vue.
 
-Le mode Play teste les comportements; il ne remplace pas le fait d'enregistrer la scène après une modification de placement dans l'éditeur.
+## Modèle et provenance
 
+Le modèle 3D utilisé par la scène provient de [patrickelectric/bluerov_ros_playground](https://github.com/patrickelectric/bluerov_ros_playground) : `Assets/Models/BlueRov2.dae`. Ce Collada embarque les couleurs diffuses des différentes pièces. Le constructeur de scène le charge sans remplacer ses matériaux par un matériau uniforme.
 
-## Fidélité et provenance du modèle ROV
+`Assets/Models/BlueRov2.urdf` est une version URDF standard minimale avec le maillage et le joint fixe de la caméra. `BlueRov2.urdf.xacro` conserve la description ROS upstream, y compris ses éléments Gazebo/Xacro. L'URDF peut être importé comme robot articulé avec le [Unity Robotics URDF Importer](https://github.com/Unity-Technologies/URDF-Importer); la scène actuelle utilise directement le DAE. Le contrôleur de Unity applique la poussée physique via six points de poussée créés dans `Assets/Editor/ConstruireLot3.cs`; les six propulseurs visibles sont déjà dans le modèle 3D.
 
-Le robot visible de la scène provient maintenant du **CAD officiel BlueROV2 R4** de Blue Robotics. Sa géométrie est convertie en maillage triangulé pour Unity (environ 1,31 million de triangles). Le maillage conserve les dimensions mesurées dans le CAD : environ 0,344 × 0,254 × 0,457 m. Ce n'est plus un assemblage de formes dessinées à la main; ce n'est toutefois pas un fichier CAO paramétrique dans Unity. Le matériau de rendu du maillage est un matériau Unity bleu-gris uniforme, car l'export OBJ utilisé ne conserve pas les matériaux distincts de chaque pièce.
+Le manifeste upstream indique **LGPLv3**. Voir [NOTICE_BlueROV2_ROS.md](Models/NOTICE_BlueROV2_ROS.md) et le dépôt source pour la provenance et les modalités d'import.
 
-### Méthode utilisée dans ce projet
-
-Le fichier `Assets/Models/BlueROV2_R4.obj` est le maillage du CAD officiel; son compagnon `BlueROV2_R4.mtl` fournit le matériau de base de l'OBJ. Le fichier source CAO est le STEP public de la révision R4. Il a été triangulé avec **Gmsh 4.15.2**, recentré, puis converti des millimètres en mètres avant d'être importé par l'importeur de modèles d'Unity. Dans `Assets/Editor/ConstruireLot3.cs`, le lot 3 instancie ce modèle, crée le collider à sa taille réelle et garde six transforms sous `Propulseurs` pour les forces du contrôleur. Les anciens meshes générés restent dans `Assets/Generated` pour les autres objets de la scène et pour le retour de secours si le modèle n'est pas présent.
-
-### Références de modèles
-
-- **Source intégrée : BlueROV2 R4**, modèle CAD officiel publié par Blue Robotics : [page produit et fichiers 3D R4](https://bluerobotics.com/store/rov/bluerov2/) · [archive CAD R4](https://cad.bluerobotics.com/BLUEROV2-R4.zip). L'archive contient notamment un fichier STEP public; c'est ce format qui a servi à produire l'OBJ de ce projet.
-- **Exemple fourni : TurboSquid 1521263**, [Underwater Robot BlueROV2](https://www.turbosquid.com/fr/3d-models/3d-underwater-robot-bluerov2-rov-model-1521263). La fiche consultée indique 167 407 polygones, des textures 4096 × 4096 et des exports Unity/FBX/OBJ; son prix affiché était de 79 $ au moment de la vérification. Ce modèle commercial n'est pas inclus dans le dépôt et n'a pas été importé.
-
-Le TurboSquid 1521263 reste une autre option commerciale, distincte du CAD fabricant. Il n'est pas utilisé dans ce projet. L'orientation retenue pour le CAD intégré est X = largeur, Y = haut, Z = avant; les six transforms de poussée, phares, caméra et ombilical sont des éléments du rig Unity, séparés du maillage visuel.
